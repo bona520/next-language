@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
-import { CookieName } from './app/enum';
+import { COOKIE_NAME } from './app/enum';
 
 const SECRET = process.env.SECRET_KEY;
-const defaultLocale = process.env.NEXT_PUBLIC_DEFAULT_LOCALE === 'en' ? 'en' : 'km';
 
 async function validateUserCookie(token: string) {
     if (!SECRET) throw new Error('SECRET_KEY is not defined');
@@ -28,33 +27,69 @@ function isLoginPath(pathname: string) {
     return /^\/(login|en\/login|km\/login)$/.test(pathname);
 }
 
-const intlMiddleware = createMiddleware({
-    locales: ['km', 'en'],
-    defaultLocale,
-    localePrefix: 'as-needed',
-});
 
 export async function middleware(req: NextRequest) {
-    const userCookie = req.cookies.get(CookieName.USER);
+    const userCookie = req.cookies.get(COOKIE_NAME.USER);
+    const cookieLocale = req.cookies.get(COOKIE_NAME.NEXT_LOCALE)?.value;
 
+    const envDefaultLocale =
+        process.env.NEXT_PUBLIC_DEFAULT_LOCALE === 'en' ? 'en' : 'km';
+
+    const defaultLocale: 'km' | 'en' = cookieLocale === 'en' || cookieLocale === 'km'
+        ? cookieLocale
+        : envDefaultLocale;
+
+    const intlMiddleware = createMiddleware({
+        locales: ['km', 'en'],
+        defaultLocale: defaultLocale,
+        localePrefix: 'as-needed',
+        localeDetection: false
+    });
     // Not logged in
     if (!userCookie?.value) {
-        return isLoginPath(req.nextUrl.pathname)
-            ? intlMiddleware(req)
-            : redirectToLogin(req);
+        if (isLoginPath(req.nextUrl.pathname)) {
+            // Only set NEXT_LOCALE cookie if not present AND no locale in path
+            const nextLocaleCookie = req.cookies.get(COOKIE_NAME.NEXT_LOCALE);
+            const isRootOrNoLocale =
+                !/^\/(en|km)(\/|$)/.test(req.nextUrl.pathname);
+            if (!nextLocaleCookie && isRootOrNoLocale) {
+                const res = intlMiddleware(req);
+                const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+                res.headers.append(
+                    'Set-Cookie',
+                    `NEXT_LOCALE=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
+                );
+                return res;
+            }
+            return intlMiddleware(req);
+        }
+        return redirectToLogin(req);
     }
 
     // Validate cookie
     const user = await validateUserCookie(userCookie.value as string);
     if (!user) {
         const res = redirectToLogin(req);
-        res.cookies.set(CookieName.USER, '', { maxAge: 0 });
+        res.cookies.set(COOKIE_NAME.USER, '', { maxAge: 0 });
         return res;
     }
 
     // Already logged in, prevent access to /login
     if (isLoginPath(req.nextUrl.pathname)) {
         return redirectToHome(req);
+    }
+
+    // Only set NEXT_LOCALE cookie if not present AND no locale in path
+    const nextLocaleCookie = req.cookies.get(COOKIE_NAME.NEXT_LOCALE);
+    const isRootOrNoLocale = !/^\/(en|km)(\/|$)/.test(req.nextUrl.pathname);
+    if (!nextLocaleCookie && isRootOrNoLocale) {
+        const res = intlMiddleware(req);
+        const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+        res.headers.append(
+            'Set-Cookie',
+            `NEXT_LOCALE=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
+        );
+        return res;
     }
 
     // Pass to next-intl middleware for i18n routing
