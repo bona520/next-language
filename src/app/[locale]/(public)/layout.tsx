@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Metadata, Viewport } from 'next';
+import DevTool from '@/components/layout/DevTool';
+import { ThemeProvider } from 'next-themes';
 
 export const viewport: Viewport = {
     width: "device-width",
@@ -11,8 +13,9 @@ export const viewport: Viewport = {
     userScalable: false,
 }
 
-export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
-    const t = await getTranslations({ locale: params.locale, namespace: '' });
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+    const { locale } = await params;
+    const t = await getTranslations({ locale, namespace: '' });
     return {
         title: {
             default: t('nextLang'),
@@ -38,9 +41,19 @@ export default async function LocaleLayout({
     setRequestLocale(locale);
 
     return (
-        <html lang={locale}>
+        <html lang={locale} suppressHydrationWarning>
             <body>
-                <NextIntlClientProvider>{children}</NextIntlClientProvider>
+                <NextIntlClientProvider>
+                    <DevTool>
+                        <ThemeProvider
+                            themes={['light', 'dark', 'system']}
+                            defaultTheme={process.env.NEXT_PUBLIC_DEFAULT_THEME as 'light' | 'dark' | 'system' || 'system'}
+                            enableSystem
+                        >
+                            {children}
+                        </ThemeProvider>
+                    </DevTool>
+                </NextIntlClientProvider>
             </body>
         </html>
     );

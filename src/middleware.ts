@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
-import { COOKIE_NAME } from './app/enum';
+import { COOKIE_NAME } from './enum';
 
 const SECRET = process.env.SECRET_KEY;
 
@@ -30,7 +30,7 @@ function isLoginPath(pathname: string) {
 
 export async function middleware(req: NextRequest) {
     const userCookie = req.cookies.get(COOKIE_NAME.USER);
-    const cookieLocale = req.cookies.get(COOKIE_NAME.NEXT_LOCALE)?.value;
+    const cookieLocale = req.cookies.get(COOKIE_NAME.LANGUAGE)?.value;
 
     const envDefaultLocale =
         process.env.NEXT_PUBLIC_DEFAULT_LOCALE === 'en' ? 'en' : 'km';
@@ -43,13 +43,16 @@ export async function middleware(req: NextRequest) {
         locales: ['km', 'en'],
         defaultLocale: defaultLocale,
         localePrefix: 'as-needed',
-        localeDetection: false
+        localeDetection: false,
+        localeCookie: {
+            maxAge: 365 * 24 * 60 * 60 * 1000
+        }
     });
     // Not logged in
     if (!userCookie?.value) {
         if (isLoginPath(req.nextUrl.pathname)) {
             // Only set NEXT_LOCALE cookie if not present AND no locale in path
-            const nextLocaleCookie = req.cookies.get(COOKIE_NAME.NEXT_LOCALE);
+            const nextLocaleCookie = req.cookies.get(COOKIE_NAME.LANGUAGE);
             const isRootOrNoLocale =
                 !/^\/(en|km)(\/|$)/.test(req.nextUrl.pathname);
             if (!nextLocaleCookie && isRootOrNoLocale) {
@@ -57,7 +60,7 @@ export async function middleware(req: NextRequest) {
                 const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
                 res.headers.append(
                     'Set-Cookie',
-                    `NEXT_LOCALE=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
+                    `${COOKIE_NAME.LANGUAGE}=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
                 );
                 return res;
             }
@@ -80,14 +83,14 @@ export async function middleware(req: NextRequest) {
     }
 
     // Only set NEXT_LOCALE cookie if not present AND no locale in path
-    const nextLocaleCookie = req.cookies.get(COOKIE_NAME.NEXT_LOCALE);
+    const nextLocaleCookie = req.cookies.get(COOKIE_NAME.LANGUAGE);
     const isRootOrNoLocale = !/^\/(en|km)(\/|$)/.test(req.nextUrl.pathname);
     if (!nextLocaleCookie && isRootOrNoLocale) {
         const res = intlMiddleware(req);
         const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
         res.headers.append(
             'Set-Cookie',
-            `NEXT_LOCALE=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
+            `${COOKIE_NAME.LANGUAGE}=${defaultLocale}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`
         );
         return res;
     }

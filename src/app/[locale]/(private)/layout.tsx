@@ -5,6 +5,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import MasterLayout from '@/components/layout/Master';
 import "@/styles/globals.css";
 import { Metadata, Viewport } from 'next';
+import { ThemeProvider } from 'next-themes';
+import DevTool from '@/components/layout/DevTool';
+import ProgressBarProvider from '@/components/ui/ProgressBarProvider';
 
 
 export const viewport: Viewport = {
@@ -14,8 +17,9 @@ export const viewport: Viewport = {
     userScalable: false,
 }
 
-export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
-    const t = await getTranslations({ locale: params.locale, namespace: '' });
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+    const { locale } = await params;
+    const t = await getTranslations({ locale, namespace: '' });
     return {
         title: {
             default: t('nextLang'),
@@ -41,12 +45,22 @@ export default async function LocaleLayout({
     setRequestLocale(locale);
 
     return (
-        <html lang={locale}>
+        <html lang={locale} suppressHydrationWarning>
             <body>
                 <NextIntlClientProvider>
-                    <MasterLayout>
-                        {children}
-                    </MasterLayout>
+                    <DevTool>
+                        <ProgressBarProvider >
+                            <ThemeProvider
+                                themes={['light', 'dark', 'system']}
+                                defaultTheme={process.env.NEXT_PUBLIC_DEFAULT_THEME as 'light' | 'dark' | 'system' || 'system'}
+                                enableSystem
+                            >
+                                <MasterLayout locale={locale}>
+                                    {children}
+                                </MasterLayout>
+                            </ThemeProvider>
+                        </ProgressBarProvider>
+                    </DevTool>
                 </NextIntlClientProvider>
             </body>
         </html>
