@@ -1,7 +1,28 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import MasterLayout from '@/components/layout/Master';
+import "@/styles/globals.css";
+import { Metadata, Viewport } from 'next';
+
+
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1.0,
+    maximumScale: 1.0,
+    userScalable: false,
+}
+
+export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
+    const t = await getTranslations({ locale: params.locale, namespace: '' });
+    return {
+        title: {
+            default: t('nextLang'),
+            template: `%s - ${t('nextLang')}`,
+        }
+    };
+}
 
 export default async function LocaleLayout({
     children,
@@ -22,7 +43,11 @@ export default async function LocaleLayout({
     return (
         <html lang={locale}>
             <body>
-                <NextIntlClientProvider>{children}</NextIntlClientProvider>
+                <NextIntlClientProvider>
+                    <MasterLayout>
+                        {children}
+                    </MasterLayout>
+                </NextIntlClientProvider>
             </body>
         </html>
     );
